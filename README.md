@@ -9,6 +9,8 @@
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/alexomay/orquesta)
 
+**▶ Demo en vivo: https://orquesta-bk0g.onrender.com** (modo demo, sin costo; si estaba dormida, la primera carga tarda unos 30 segundos).
+
 Cuando llega un ticket, tres agentes trabajan en cadena:
 
 1. **Triage**: lo clasifica, asigna prioridad y detecta riesgos como la ingeniería social.
@@ -158,7 +160,9 @@ El agente Resolver consulta la base de conocimiento con `search_knowledge_base`.
 
 ## Demo en línea
 
-El botón **Deploy to Render** de arriba crea una copia en modo demo con el plan gratuito, usando [render.yaml](render.yaml). En el plan gratuito el servicio se duerme tras 15 minutos sin uso: la primera visita tarda unos 30 segundos y los datos de la demo se reinician.
+La demo pública está en **https://orquesta-bk0g.onrender.com**. Prueba los cuatro ejemplos del panel; en "Cuenta bloqueada" puedes aprobar o denegar la acción tú mismo.
+
+El botón **Deploy to Render** de arriba crea tu propia copia en modo demo con el plan gratuito, usando [render.yaml](render.yaml). En el plan gratuito el servicio se duerme tras 15 minutos sin uso: la primera visita tarda unos 30 segundos y los datos de la demo se reinician.
 
 ## Próximos pasos
 
