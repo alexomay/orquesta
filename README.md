@@ -21,6 +21,15 @@ Todo se ve en vivo en el panel web: el razonamiento resumido de cada agente, las
 
 ![Aprobación humana](docs/aprobacion-humana.png)
 
+## La ejecución, en vivo
+
+Cada ticket muestra dos vistas que se actualizan con los eventos del WebSocket:
+
+- **Grafo de agentes:** Triage → Resolver → Revisor QA, con las herramientas que el Resolver usa en ese ticket y, si aplica, la compuerta de aprobación humana. Los nodos se encienden mientras trabajan y las conexiones muestran por dónde va el flujo.
+- **Traza de la ejecución:** una cascada, al estilo de las herramientas de observabilidad, con cada agente, cada llamada al modelo (latencia y tokens) y cada herramienta en un eje de tiempo. La espera de la aprobación humana aparece como su propio tramo.
+
+![Grafo de agentes y traza de la ejecución](docs/grafo-y-traza.png)
+
 ## Qué demuestra este proyecto
 
 | Tema | Implementación |
