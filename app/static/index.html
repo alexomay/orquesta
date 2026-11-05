@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orquesta · Agentes de IA para mesa de ayuda</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2311151c'/><path d='M8 22c3-8 5-12 8-12s5 4 8 12' stroke='%23f2a03d' stroke-width='3' fill='none' stroke-linecap='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0e13; --panel: #11151c; --panel-2: #161b24; --line: #232a36; --line-2: #2d3644;
+  --text: #e7ebf1; --muted: #8b95a5; --dim: #5d6777;
+  --accent: #f2a03d; --accent-soft: rgba(242,160,61,.12);
+  --ok: #3ccf91; --ok-soft: rgba(60,207,145,.12);
+  --warn: #f5c84b; --warn-soft: rgba(245,200,75,.12);
+  --bad: #ff6b6b; --bad-soft: rgba(255,107,107,.12);
+  --info: #6aa8ff; --info-soft: rgba(106,168,255,.12);
+  --violet: #b18cff; --violet-soft: rgba(177,140,255,.12);
+  --radius: 12px;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: hidden; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 Inter, system-ui, sans-serif; }
+button, input, textarea, select { font: inherit; color: inherit; }
+a { color: var(--accent); }
+
+header { display: flex; align-items: center; gap: 14px; padding: 14px 24px;
+  border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+.logo svg { width: 28px; height: 28px; }
+.logo small { color: var(--muted); font-weight: 500; font-size: 13px; }
+.spacer { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; border: 1px solid var(--line-2); color: var(--muted); white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+.dot.live { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+header nav a { color: var(--muted); text-decoration: none; font-size: 13px; }
+header nav a:hover { color: var(--text); }
+
+.metrics { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--line);
+  border-bottom: 1px solid var(--line); }
+.metric { background: var(--panel); padding: 14px 20px; }
+.metric b { display: block; font-size: 22px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.metric span { color: var(--muted); font-size: 12px; }
+
+main { display: grid; grid-template-columns: 360px 1fr; min-height: calc(100vh - 140px); }
+aside { border-right: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+h2 { font-size: 12px; text-transform: none; color: var(--muted); font-weight: 600; margin: 0 0 10px; letter-spacing: .02em; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.samples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip { border: 1px solid var(--line-2); background: var(--panel-2); border-radius: 999px; padding: 4px 11px;
+  font-size: 12px; cursor: pointer; color: var(--muted); }
+.chip:hover { color: var(--text); border-color: var(--accent); }
+label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+input, textarea, select { width: 100%; background: var(--bg); border: 1px solid var(--line-2); border-radius: 8px;
+  padding: 8px 10px; outline: none; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+textarea { min-height: 84px; resize: vertical; }
+.btn { border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 600; cursor: pointer; }
+.btn-primary { background: var(--accent); color: #1a1206; width: 100%; margin-top: 12px; }
+.btn-primary:disabled { opacity: .5; cursor: wait; }
+.btn-ok { background: var(--ok); color: #04170e; }
+.btn-bad { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+.btn-ghost { background: var(--panel-2); border: 1px solid var(--line-2); color: var(--text); }
+
+.tickets { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.t-item { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; cursor: pointer; width: 100%; }
+.t-item:hover { border-color: var(--line-2); }
+.t-item.active { border-color: var(--accent); background: var(--accent-soft); }
+.t-item .row { display: flex; align-items: center; gap: 8px; }
+.t-item .subj { font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-item .meta { color: var(--dim); font-size: 12px; margin-top: 3px; }
+.status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.s-resolved { background: var(--ok-soft); color: var(--ok); }
+.s-escalated { background: var(--violet-soft); color: var(--violet); }
+.s-awaiting_approval { background: var(--warn-soft); color: var(--warn); }
+.s-failed { background: var(--bad-soft); color: var(--bad); }
+.s-new, .s-triaged, .s-in_progress { background: var(--info-soft); color: var(--info); }
+.empty { color: var(--dim); font-size: 13px; padding: 14px; text-align: center; border: 1px dashed var(--line-2); border-radius: 10px; }
+
+section.detail { padding: 24px 28px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.hero { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.hero h1 { margin: 0; font-size: 20px; letter-spacing: -.015em; }
+.hero .who { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tag { font-size: 12px; padding: 2px 9px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--muted); }
+.tag.risk { color: var(--bad); border-color: rgba(255,107,107,.4); background: var(--bad-soft); }
+.body-quote { color: var(--muted); border-left: 2px solid var(--line-2); padding-left: 12px; margin: 0; white-space: pre-wrap; }
+
+.pipeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; position: relative; }
+.stage .name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.stage .desc { color: var(--dim); font-size: 12px; }
+.stage .st { position: absolute; top: 12px; right: 12px; font-size: 11px; color: var(--dim); }
+.stage.running { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.stage.running .st { color: var(--accent); }
+.stage.done .st { color: var(--ok); }
+.stage.waiting { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.stage.waiting .st { color: var(--warn); }
+.ag { width: 8px; height: 8px; border-radius: 2px; }
+.ag-triage { background: var(--info); } .ag-resolver { background: var(--accent); }
+.ag-reviewer { background: var(--violet); } .ag-system { background: var(--dim); }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+.timeline { display: flex; flex-direction: column; gap: 8px; }
+.ev { display: grid; grid-template-columns: 18px 1fr; gap: 10px; animation: in .25s ease-out; }
+@keyframes in { from { opacity: 0; transform: translateY(4px); } }
+.ev .rail { display: flex; justify-content: center; padding-top: 7px; }
+.ev .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-width: 0; }
+.ev .head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.ev .who { font-weight: 600; }
+.ev .time { color: var(--dim); font-size: 11px; margin-left: auto; font-family: var(--mono); }
+.ev.thinking .box { background: transparent; border-style: dashed; color: var(--muted); font-style: italic; }
+.ev.usage .box { background: transparent; border: 0; padding: 0 0 0 2px; color: var(--dim); font-size: 12px; font-family: var(--mono); }
+.ev.err .box { border-color: rgba(255,107,107,.45); }
+code, .mono { font-family: var(--mono); font-size: 12px; }
+.toolname { font-family: var(--mono); color: var(--accent); }
+details { margin-top: 6px; }
+summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+pre { margin: 6px 0 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+  font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; color: #c9d1dc; }
+.approval { border: 1px solid var(--warn); background: linear-gradient(var(--warn-soft), var(--warn-soft)), var(--panel);
+  border-radius: var(--radius); padding: 14px; }
+.approval h3 { margin: 0 0 4px; font-size: 14px; color: var(--warn); }
+.approval .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.approval input { margin-top: 8px; }
+.reply { border-color: rgba(60,207,145,.45); }
+.reply h3, .side h3 { margin: 0 0 8px; font-size: 13px; }
+.reply p { margin: 0; white-space: pre-wrap; }
+.side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 84px; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; font-size: 13px; }
+.kv span { color: var(--muted); }
+.kv b { font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+.note { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
+.note:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.placeholder { display: grid; place-items: center; text-align: center; color: var(--muted); padding: 60px 20px; }
+.placeholder h1 { color: var(--text); font-size: 22px; margin: 12px 0 6px; }
+.placeholder p { max-width: 460px; margin: 0 auto; }
+.flow { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 18px; flex-wrap: wrap; font-size: 13px; }
+.flow .chip { cursor: default; }
+.toast { position: fixed; bottom: 18px; right: 18px; background: var(--panel-2); border: 1px solid var(--line-2);
+  padding: 10px 14px; border-radius: 10px; max-width: 360px; z-index: 20; animation: in .2s; }
+.toast.bad { border-color: var(--bad); }
+
+@media (max-width: 1100px) {
+  .metrics { grid-template-columns: repeat(3, 1fr); }
+  .cols { grid-template-columns: 1fr; }
+  .side { position: static; }
+}
+@media (max-width: 800px) {
+  header { padding: 12px 16px; flex-wrap: wrap; }
+  header nav { display: none; }
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+  .metric { padding: 12px 16px; }
+  main { grid-template-columns: minmax(0, 1fr); }
+  .metric span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  aside { min-width: 0; border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; }
+  .tickets { max-height: 300px; }
+  section.detail { padding: 16px; }
+  .pipeline { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#161b24"/><path d="M8 22c3-8 5-12 8-12s5 4 8 12" stroke="#f2a03d" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="16" cy="10" r="2.5" fill="#f2a03d"/></svg>
+    Orquesta <small>agentes de IA para mesa de ayuda</small>
+  </div>
+  <div class="spacer"></div>
+  <span class="pill" id="mode">…</span>
+  <span class="pill"><span class="dot" id="ws-dot"></span><span id="ws-label">conectando</span></span>
+  <nav><a href="/docs" target="_blank">API</a> · <a href="https://github.com/alexomay/orquesta" target="_blank">GitHub</a></nav>
+</header>
+
+<div class="metrics">
+  <div class="metric"><b id="m-tickets">0</b><span>Tickets</span></div>
+  <div class="metric"><b id="m-auto">–</b><span>Resueltos sin humano</span></div>
+  <div class="metric"><b id="m-pending">0</b><span>Aprobaciones pendientes</span></div>
+  <div class="metric"><b id="m-cost">–</b><span>Costo promedio por ticket</span></div>
+  <div class="metric"><b id="m-time">–</b><span>Tiempo promedio</span></div>
+  <div class="metric"><b id="m-tokens">0</b><span>Tokens procesados</span></div>
+</div>
+
+<main>
+  <aside>
+    <div class="card">
+      <h2>Nuevo ticket</h2>
+      <div class="samples" id="samples"></div>
+      <form id="form">
+        <label for="f-email">Solicitante</label>
+        <select id="f-email" required>
+          <option value="sofia.mendez@nexa.mx">Sofía Méndez · Logística</option>
+          <option value="ana.torres@nexa.mx">Ana Torres · Ventas</option>
+          <option value="luis.ramirez@nexa.mx">Luis Ramírez · Finanzas</option>
+          <option value="carlos.vega@nexa.mx">Carlos Vega · Producción</option>
+          <option value="roberto.salinas@nexa.mx">Roberto Salinas · Dirección</option>
+        </select>
+        <label for="f-subject">Asunto</label>
+        <input id="f-subject" required minlength="3" maxlength="200" placeholder="¿Qué está fallando?">
+        <label for="f-body">Descripción</label>
+        <textarea id="f-body" required minlength="5" maxlength="4000" placeholder="Cuéntanos qué pasa"></textarea>
+        <button class="btn btn-primary" id="f-submit" type="submit">Enviar a los agentes</button>
+      </form>
+    </div>
+    <div style="min-height:0; display:flex; flex-direction:column;">
+      <h2>Tickets</h2>
+      <div class="tickets" id="tickets"><div class="empty">Aún no hay tickets. Usa un ejemplo de arriba.</div></div>
+    </div>
+  </aside>
+
+  <section class="detail" id="detail">
+    <div class="placeholder">
+      <div>
+        <svg width="56" height="56" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#161b24"/><path d="M8 22c3-8 5-12 8-12s5 4 8 12" stroke="#f2a03d" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="16" cy="10" r="2.5" fill="#f2a03d"/></svg>
+        <h1>Tres agentes, un ticket a la vez</h1>
+        <p>Crea un ticket y observa en vivo cómo los agentes lo clasifican, investigan con herramientas, piden aprobación para acciones sensibles y revisan la respuesta antes de enviarla.</p>
+        <div class="flow"><span class="chip">Triage</span>→<span class="chip">Resolver + herramientas</span>→<span class="chip">Aprobación humana</span>→<span class="chip">Revisor QA</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtUsd = (n) => n == null ? "–" : "$" + (n < 0.01 ? n.toFixed(4) : n.toFixed(3));
+const fmtNum = (n) => n >= 1e6 ? (n/1e6).toFixed(1) + "M" : n >= 1e3 ? (n/1e3).toFixed(1) + "k" : String(n ?? 0);
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString("es-MX", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+const STATUS = {new: "Nuevo", triaged: "Clasificado", in_progress: "En proceso", awaiting_approval: "Esperando aprobación",
+  resolved: "Resuelto", escalated: "Escalado", failed: "Falló"};
+const AGENTS = {triage: "Triage", resolver: "Resolver", reviewer: "Revisor QA", system: "Sistema"};
+const MODEL_NAMES = {"claude-opus-5-5": "Claude Opus 5.5", "fake-llm": "LLM simulado"};
+
+let health = null, current = null; // current = {ticketId, runId, events: [], detail}
+let refreshTimer = null;
+
+async function api(path, opts = {}) {
+  const headers = {"Content-Type": "application/json", ...(opts.headers || {})};
+  const res = await fetch(path, {...opts, headers});
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { const j = await res.json(); msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail); } catch {}
+    throw Object.assign(new Error(msg), {status: res.status});
+  }
+  return res.json();
+}
+
+function toast(msg, bad = false) {
+  const el = document.createElement("div");
+  el.className = "toast" + (bad ? " bad" : "");
+  el.textContent = msg;
+  document.body.append(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+// --- Encabezado, métricas y lista -------------------------------------------------------
+async function loadHealth() {
+  health = await api("/api/health");
+  const name = MODEL_NAMES[health.model] || health.model;
+  $("#mode").innerHTML = health.llm === "fake"
+    ? `<span class="dot" style="background:var(--warn)"></span>Modo demo · ${esc(name)}`
+    : `<span class="dot live"></span>${esc(name)}`;
+}
+
+async function loadMetrics() {
+  const m = await api("/api/metrics");
+  $("#m-tickets").textContent = m.tickets;
+  $("#m-auto").textContent = m.auto_resolution_rate == null ? "–" : Math.round(m.auto_resolution_rate * 100) + "%";
+  $("#m-pending").textContent = m.approvals.pending || 0;
+  $("#m-cost").textContent = fmtUsd(m.avg_cost_usd);
+  $("#m-time").textContent = m.avg_duration_s == null ? "–" : m.avg_duration_s.toFixed(1) + " s";
+  $("#m-tokens").textContent = fmtNum(m.total_tokens);
+}
+
+async function loadTickets() {
+  const list = await api("/api/tickets");
+  const box = $("#tickets");
+  if (!list.length) return;
+  box.innerHTML = list.map((t) => `
+    <button class="t-item ${current && current.ticketId === t.id ? "active" : ""}" data-id="${t.id}">
+      <div class="row"><span class="subj">${esc(t.subject)}</span><span class="status s-${t.status}">${STATUS[t.status] || t.status}</span></div>
+      <div class="meta">#${t.id} · ${esc(t.requester_email)}${t.category ? " · " + esc(t.category) : ""}${t.priority ? " · " + esc(t.priority) : ""}</div>
+    </button>`).join("");
+  box.querySelectorAll(".t-item").forEach((b) => b.onclick = () => openTicket(+b.dataset.id));
+}
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => { loadTickets(); loadMetrics(); if (current) refreshSide(); }, 250);
+}
+
+// --- Formulario -------------------------------------------------------------------------
+async function loadSamples() {
+  const samples = await api("/api/samples");
+  $("#samples").innerHTML = samples.map((s, i) => `<button class="chip" data-i="${i}" type="button">${esc(s.label)}</button>`).join("");
+  $("#samples").querySelectorAll(".chip").forEach((c) => c.onclick = () => {
+    const s = samples[+c.dataset.i];
+    $("#f-email").value = s.requester_email; $("#f-subject").value = s.subject; $("#f-body").value = s.body;
+  });
+}
+
+$("#form").onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = $("#f-submit");
+  btn.disabled = true;
+  try {
+    const res = await api("/api/tickets", {method: "POST", body: JSON.stringify({
+      requester_email: $("#f-email").value, subject: $("#f-subject").value, body: $("#f-body").value})});
+    $("#f-subject").value = ""; $("#f-body").value = "";
+    await loadTickets();
+    await openTicket(res.ticket.id, res.run_id);
+  } catch (err) { toast("No se pudo crear el ticket: " + err.message, true); }
+  finally { btn.disabled = false; }
+};
+
+// --- Detalle de ticket ------------------------------------------------------------------
+async function openTicket(ticketId, runId = null) {
+  const detail = await api(`/api/tickets/${ticketId}`);
+  runId = runId || (detail.runs[0] && detail.runs[0].id);
+  const run = runId ? await api(`/api/runs/${runId}`) : {events: [], run: null};
+  current = {ticketId, runId, detail, run: run.run, events: run.events};
+  history.replaceState(null, "", "#ticket=" + ticketId);
+  renderDetail();
+  loadTickets();
+}
+
+async function refreshSide() {
+  const {ticketId, runId} = current;
+  const [detail, run] = await Promise.all([api(`/api/tickets/${ticketId}`), runId ? api(`/api/runs/${runId}`) : null]);
+  if (!current || current.ticketId !== ticketId) return;
+  current.detail = detail;
+  if (run) current.run = run.run;
+  renderHero(); renderSide(); renderPipeline();
+}
+
+function renderDetail() {
+  $("#detail").innerHTML = `
+    <div id="hero"></div>
+    <div class="pipeline" id="pipeline"></div>
+    <div class="cols">
+      <div><h2>Línea de tiempo</h2><div class="timeline" id="timeline"></div></div>
+      <div class="side" id="side"></div>
+    </div>`;
+  renderHero(); renderPipeline(); renderSide();
+  const tl = $("#timeline");
+  if (!current.events.length) tl.innerHTML = `<div class="empty">Esperando eventos…</div>`;
+  current.events.forEach((e) => tl.append(renderEvent(e)));
+}
+
+function renderHero() {
+  const t = current.detail.ticket;
+  const flags = (t.risk_flags || []).map((f) => `<span class="tag risk">⚠ ${esc(f.replace("_", " "))}</span>`).join("");
+  $("#hero").innerHTML = `
+    <div class="hero">
+      <div style="min-width:0">
+        <h1>${esc(t.subject)}</h1>
+        <div class="who">#${t.id} · ${esc(t.requester_email)} · ${new Date(t.created_at).toLocaleString("es-MX")}</div>
+        <div class="tags">
+          ${t.category ? `<span class="tag">Categoría: ${esc(t.category)}</span>` : ""}
+          ${t.priority ? `<span class="tag">Prioridad: ${esc(t.priority)}</span>` : ""}
+          ${t.escalated_to ? `<span class="tag">Escalado a ${esc(t.escalated_to)}</span>` : ""}
+          ${flags}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="status s-${t.status}">${STATUS[t.status] || t.status}</span>
+        ${["resolved","escalated","failed"].includes(t.status) ? `<button class="btn btn-ghost" id="rerun">Ejecutar de nuevo</button>` : ""}
+      </div>
+    </div>
+    <p class="body-quote" style="margin-top:12px">${esc(t.body)}</p>`;
+  const rr = $("#rerun");
+  if (rr) rr.onclick = async () => {
+    try { const r = await api(`/api/tickets/${t.id}/runs`, {method: "POST"}); await openTicket(t.id, r.run_id); }
+    catch (err) { toast(err.message, true); }
+  };
+}
+
+function stageState(agent) {
+  const ev = current.events;
+  const started = ev.some((e) => e.agent === agent && e.type === "agent.started");
+  const lastStart = ev.map((e) => e.type === "agent.started" ? e.agent : null).filter(Boolean).pop();
+  const finished = ev.filter((e) => e.agent === agent && e.type === "agent.finished").length;
+  const startedCount = ev.filter((e) => e.agent === agent && e.type === "agent.started").length;
+  const runDone = ev.some((e) => e.type === "run.completed" || e.type === "run.failed");
+  const waiting = current.run && current.run.status === "awaiting_approval" && agent === "resolver";
+  if (waiting) return ["waiting", "esperando aprobación"];
+  if (!started) return ["", "pendiente"];
+  if (finished >= startedCount || runDone) return ["done", "listo"];
+  return lastStart === agent ? ["running", "trabajando…"] : ["done", "listo"];
+}
+
+function renderPipeline() {
+  const stages = [
+    ["triage", "Triage", "Clasifica, prioriza y detecta riesgos"],
+    ["resolver", "Resolver", "Investiga y actúa con herramientas"],
+    ["reviewer", "Revisor QA", "Califica la respuesta antes de enviarla"],
+  ];
+  $("#pipeline").innerHTML = stages.map(([k, name, desc]) => {
+    const [cls, label] = stageState(k);
+    return `<div class="stage ${cls}"><div class="name"><span class="ag ag-${k}"></span>${name}</div><div class="desc">${desc}</div><span class="st">${label}</span></div>`;
+  }).join("");
+}
+
+function renderSide() {
+  const r = current.run, d = current.detail;
+  const t = d.ticket;
+  let html = "";
+  if (t.reply) html += `<div class="card reply"><h3>Respuesta enviada al solicitante</h3><p>${esc(t.reply)}</p></div>`;
+  if (r) html += `<div class="card"><h3>Costo y uso</h3><div class="kv">
+      <span>Modelo</span><b>${esc(MODEL_NAMES[r.model] || r.model)}</b>
+      <span>Llamadas al LLM</span><b>${r.llm_calls}</b>
+      <span>Tokens de entrada</span><b>${fmtNum(r.input_tokens)}</b>
+      <span>Tokens de salida</span><b>${fmtNum(r.output_tokens)}</b>
+      <span>Leídos de caché</span><b>${fmtNum(r.cache_read_tokens)}</b>
+      <span>Costo</span><b>${fmtUsd(r.cost_usd)}</b>
+    </div>${r.error ? `<div class="note" style="color:var(--bad)">${esc(r.error)}</div>` : ""}</div>`;
+  if (d.notes.length) html += `<div class="card"><h3>Notas internas</h3>${d.notes.map((n) => `<div class="note">${esc(n.text)}</div>`).join("")}</div>`;
+  $("#side").innerHTML = html;
+}
+
+function jsonBlock(obj, label) {
+  return `<details><summary>${label}</summary><pre>${esc(JSON.stringify(obj, null, 2))}</pre></details>`;
+}
+
+function renderEvent(e) {
+  const p = e.payload || {};
+  const el = document.createElement("div");
+  el.className = "ev";
+  el.dataset.seq = e.seq;
+  const who = `<span class="who">${AGENTS[e.agent] || e.agent}</span>`;
+  const time = `<span class="time">${fmtTime(e.created_at)}</span>`;
+  let body = "";
+  switch (e.type) {
+    case "run.started": body = `<div class="head">${who}<span>Ejecución iniciada con ${esc(MODEL_NAMES[p.model] || p.model)}</span>${time}</div>`; break;
+    case "agent.started": body = `<div class="head">${who}<span>${p.revision ? "Corrige la respuesta (ronda " + p.revision + ")" : p.round ? "Revisa la respuesta" : "Comienza"}</span>${time}</div>`; break;
+    case "agent.thinking": el.classList.add("thinking"); body = `<div class="head">${who}${time}</div><div>💭 ${esc(p.text)}</div>`; break;
+    case "agent.message": body = `<div class="head">${who}${time}</div><div>${esc(p.text)}</div>`; break;
+    case "tool.called": body = `<div class="head">${who}<span>llama a <span class="toolname">${esc(p.name)}</span></span>${p.requires_approval ? `<span class="status s-awaiting_approval">requiere aprobación</span>` : ""}${time}</div>${jsonBlock(p.input, "Entrada")}`; break;
+    case "tool.result":
+      if (p.is_error) el.classList.add("err");
+      body = `<div class="head">${who}<span><span class="toolname">${esc(p.name)}</span> ${p.is_error ? "<span style='color:var(--bad)'>devolvió un error</span>" : "respondió"} · ${p.duration_ms} ms</span>${time}</div>${jsonBlock(p.output, "Resultado")}`; break;
+    case "approval.requested": {
+      const approval = (current.detail.approvals || []).find((a) => a.id === p.approval_id);
+      const pending = !approval || approval.status === "pending";
+      const decided = current.events.some((x) => x.type === "approval.decided" && x.payload.approval_id === p.approval_id);
+      el.innerHTML = `<div class="rail"><span class="ag" style="background:var(--warn)"></span></div>
+        <div class="approval" id="approval-${p.approval_id}">
+          <h3>⏸ Acción sensible: aprobación requerida</h3>
+          <div>El agente quiere ejecutar <span class="toolname">${esc(p.tool)}</span>:</div>
+          <pre>${esc(JSON.stringify(p.input, null, 2))}</pre>
+          ${pending && !decided ? `
+          <input placeholder="Motivo (opcional)" id="reason-${p.approval_id}">
+          <div class="actions">
+            <button class="btn btn-ok" data-a="approve">Aprobar</button>
+            <button class="btn btn-bad" data-a="deny">Denegar</button>
+          </div>` : `<div class="note">Decisión registrada.</div>`}
+        </div>`;
+      el.querySelectorAll("[data-a]").forEach((b) => b.onclick = () => decide(p.approval_id, b.dataset.a));
+      return el;
+    }
+    case "approval.decided":
+      body = `<div class="head">${who}<span>${p.approved ? "✅ Aprobado" : "⛔ Denegado"}${p.decided_by ? " por " + esc(p.decided_by) : ""}${p.reason ? ": " + esc(p.reason) : ""}</span>${time}</div>`;
+      { const card = $("#approval-" + p.approval_id); if (card) { const a = card.querySelector(".actions"); const i = card.querySelector("input"); if (a) a.remove(); if (i) i.remove(); } }
+      break;
+    case "llm.usage": el.classList.add("usage");
+      body = `${esc(MODEL_NAMES[p.model] || p.model)} · ${fmtNum(p.input_tokens)} entrada${p.cache_read_tokens ? " (" + fmtNum(p.cache_read_tokens) + " caché)" : ""} · ${fmtNum(p.output_tokens)} salida · ${fmtUsd(p.cost_usd)} · ${(p.latency_ms / 1000).toFixed(1)} s`; break;
+    case "agent.finished": {
+      const o = p.output;
+      let txt = "Terminó";
+      if (e.agent === "triage" && o) txt = `Clasificó como <b>${esc(o.category)}</b>, prioridad <b>${esc(o.priority)}</b>: ${esc(o.summary)}`;
+      if (e.agent === "reviewer" && o) txt = `${o.approved ? "Aprobó" : "Pidió cambios a"} la respuesta · calificación <b>${o.score}/10</b>${o.issues.length ? ": " + esc(o.issues.join("; ")) : ""}`;
+      if (e.agent === "resolver") txt = "Propuso una respuesta";
+      body = `<div class="head">${who}<span>${txt}</span>${time}</div>`; break;
+    }
+    case "run.completed": body = `<div class="head">${who}<span>✔ Ticket ${STATUS[p.ticket_status]?.toLowerCase() || p.ticket_status} en ${p.duration_s} s · ${p.llm_calls} llamadas · ${fmtUsd(p.cost_usd)}</span>${time}</div>`; break;
+    case "run.failed": el.classList.add("err"); body = `<div class="head">${who}<span style="color:var(--bad)">Falló: ${esc(p.error)}</span>${time}</div>`; break;
+    default: body = `<div class="head">${who}<span>${esc(e.type)}</span>${time}</div>`;
+  }
+  el.innerHTML = `<div class="rail"><span class="ag ag-${esc(e.agent)}"></span></div><div class="box">${body}</div>`;
+  return el;
+}
+
+async function decide(approvalId, decision) {
+  const reason = ($("#reason-" + approvalId) || {}).value || null;
+  const headers = {};
+  if (health && health.approvals_protected) {
+    let token = null;
+    try { token = localStorage.getItem("orquesta-admin"); } catch {}
+    if (!token) { token = prompt("Token de administrador"); try { localStorage.setItem("orquesta-admin", token); } catch {} }
+    headers["X-Admin-Token"] = token;
+  }
+  try {
+    await api(`/api/approvals/${approvalId}`, {method: "POST", headers,
+      body: JSON.stringify({decision, reason, decided_by: "operador web"})});
+  } catch (err) {
+    if (err.status === 401) { try { localStorage.removeItem("orquesta-admin"); } catch {} }
+    toast("No se pudo registrar la decisión: " + err.message, true);
+  }
+}
+
+// --- Tiempo real ------------------------------------------------------------------------
+function connect() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/events");
+  ws.onopen = () => { $("#ws-dot").classList.add("live"); $("#ws-label").textContent = "en vivo"; };
+  ws.onclose = () => { $("#ws-dot").classList.remove("live"); $("#ws-label").textContent = "reconectando"; setTimeout(connect, 2000); };
+  ws.onmessage = (msg) => {
+    const e = JSON.parse(msg.data);
+    if (!e.run_id) return;
+    if (current && e.run_id === current.runId && !current.events.some((x) => x.seq === e.seq)) {
+      current.events.push(e);
+      const tl = $("#timeline");
+      if (tl) {
+        const empty = tl.querySelector(".empty"); if (empty) empty.remove();
+        tl.append(renderEvent({...e, id: e.seq}));
+        tl.lastElementChild.scrollIntoView({behavior: "smooth", block: "nearest"});
+      }
+      renderPipeline();
+    }
+    if (e.type === "approval.requested" && !(current && current.runId === e.run_id)) toast(`El ticket #${e.ticket_id} necesita aprobación`);
+    if (["run.started", "approval.requested", "approval.decided", "run.completed", "run.failed", "agent.finished", "llm.usage"].includes(e.type)) scheduleRefresh();
+  };
+}
+
+(async function init() {
+  try { await Promise.all([loadHealth(), loadMetrics(), loadTickets(), loadSamples()]); }
+  catch (err) { toast("No se pudo cargar: " + err.message, true); }
+  const linked = location.hash.match(/ticket=(\d+)/);
+  if (linked) openTicket(+linked[1]).catch(() => {});
+  connect();
+})();
+</script>
+</body>
+</html>
