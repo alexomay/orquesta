@@ -10,17 +10,12 @@ import itertools
 import json
 import re
 import time
-import unicodedata
 from typing import Any
 
+from ..text import norm
 from .base import LLMRequest, LLMResult, Usage
 
 _ids = itertools.count(1)
-
-
-def norm(s: str) -> str:
-    s = unicodedata.normalize("NFKD", s)
-    return "".join(c for c in s if not unicodedata.combining(c)).lower()
 
 
 def _tokens(obj: Any) -> int:

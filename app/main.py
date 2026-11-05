@@ -17,6 +17,8 @@ from .db import init_db, make_engine, make_sessions
 from .events import EventBus
 from .llm import LLM, build_llm
 from .models import Approval, Run, Ticket, utcnow
+from .rag import Retriever
+from .rag.embeddings import build_embedder
 from .seed import seed
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -63,6 +65,9 @@ def create_app(settings: Settings | None = None, llm: LLM | None = None) -> Fast
             await seed(sessions)
         await recover_interrupted(sessions)
 
+        retriever = Retriever(build_embedder(settings.voyage_api_key))
+        await retriever.index_from_db(sessions)
+
         bus, broker = EventBus(), ApprovalBroker()
         orchestrator = Orchestrator(
             sessions=sessions,
@@ -70,17 +75,20 @@ def create_app(settings: Settings | None = None, llm: LLM | None = None) -> Fast
             bus=bus,
             broker=broker,
             settings=settings,
+            retriever=retriever,
         )
         app.state.settings = settings
         app.state.sessions = sessions
         app.state.bus = bus
         app.state.broker = broker
         app.state.orchestrator = orchestrator
+        app.state.retriever = retriever
         log.info(
-            "Orquesta %s lista · LLM: %s (%s)",
+            "Orquesta %s lista · LLM: %s (%s) · búsqueda: %s",
             __version__,
             orchestrator.llm.name,
             orchestrator.llm.model,
+            retriever.mode,
         )
         yield
         await orchestrator.shutdown()

@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     llm_mode: Literal["auto", "anthropic", "fake"] = "auto"
     model: str = "claude-opus-5-5"
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
+    # Opcional: activa la búsqueda semántica (embeddings de Voyage AI) junto a BM25.
+    voyage_api_key: str | None = Field(default=None, validation_alias="VOYAGE_API_KEY")
 
     fake_latency_s: float = 0.7
     max_agent_turns: int = 12

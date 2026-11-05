@@ -24,6 +24,7 @@ from ..events import EventBus
 from ..llm import LLM, LLMError, LLMRequest, LLMResult, Usage
 from ..models import Approval, Run, RunEvent, Ticket, utcnow
 from ..pricing import cost_usd
+from ..rag import Retriever
 from .prompts import (
     RESOLVER_SYSTEM,
     REVIEW_SCHEMA,
@@ -97,12 +98,14 @@ class Orchestrator:
         bus: EventBus,
         broker: ApprovalBroker,
         settings: Settings,
+        retriever: Retriever,
     ) -> None:
         self.sessions = sessions
         self.llm = llm
         self.bus = bus
         self.broker = broker
         self.settings = settings
+        self.retriever = retriever
         self.tool_defs = tool_definitions()
         self._tasks: set[asyncio.Task] = set()
 
@@ -358,7 +361,9 @@ class Orchestrator:
                     )
                 else:
                     try:
-                        ctx = ToolContext(self.sessions, state.ticket_id, state.run_id)
+                        ctx = ToolContext(
+                            self.sessions, state.ticket_id, state.run_id, self.retriever
+                        )
                         out, is_error = await tool.func(ctx, args), False
                     except ToolError as e:
                         out, is_error = {"error": str(e)}, True

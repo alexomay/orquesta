@@ -7,6 +7,8 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-async-009688)
 ![Claude](https://img.shields.io/badge/LLM-Claude%20Opus%205.5-orange)
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/alexomay/orquesta)
+
 Cuando llega un ticket, tres agentes trabajan en cadena:
 
 1. **Triage**: lo clasifica, asigna prioridad y detecta riesgos como la ingeniería social.
@@ -24,11 +26,12 @@ Todo se ve en vivo en el panel web: el razonamiento resumido de cada agente, las
 | **IA agéntica** | Ciclo de herramientas propio sobre la API de Claude, con llamadas en paralelo, esquemas estrictos (`strict: true`) y salidas estructuradas (JSON Schema) |
 | **Humano en el ciclo** | Las herramientas declaran su riesgo; las sensibles crean una aprobación y la ejecución espera la decisión, con tiempo de expiración |
 | **Seguridad** | El texto del ticket se trata como datos no confiables. Hay defensa contra *prompt injection* y una política de "solo el titular" para cambios de credenciales. La aprobación puede protegerse con un token |
+| **RAG** | Búsqueda híbrida en la base de conocimiento: BM25 implementado desde cero con tokenización en español, embeddings opcionales (Voyage AI) y fusión con Reciprocal Rank Fusion. Hay un set de evaluación que bloquea la CI si la calidad baja |
 | **Tiempo real** | Bus de eventos asíncrono que manda cada paso por WebSocket; los eventos también se guardan para reconstruir el historial |
 | **Costos** | Tokens y costo en USD por llamada, por ejecución y en promedio, calculados con el modelo que realmente respondió; caché de prompts activada |
 | **Resiliencia** | Respaldo automático de modelo del lado del servidor si un clasificador rechaza la petición; recuperación de ejecuciones interrumpidas al reiniciar; límites de turnos |
 | **Backend** | FastAPI asíncrono, SQLAlchemy 2.0 (SQLite o PostgreSQL), Pydantic v2, configuración por entorno |
-| **Calidad** | 17 pruebas con pytest (flujos de punta a punta, API y unidades), ruff y CI en GitHub Actions que también construye y arranca la imagen de Docker |
+| **Calidad** | 22 pruebas con pytest (flujos de punta a punta, API y unidades), ruff y CI en GitHub Actions que también construye y arranca la imagen de Docker |
 | **Modo demo** | Un LLM simulado y determinista permite correr la demo y las pruebas sin API key ni costo |
 
 ## Arquitectura
@@ -43,6 +46,7 @@ flowchart LR
     ORQ --> Q[Revisor QA]
     T & R & Q --> LLM{{Claude API<br/>o LLM simulado}}
     R --> TOOLS[Herramientas]
+    TOOLS --> RAG[Búsqueda híbrida<br/>BM25 + embeddings]
     TOOLS -->|acción sensible| APR[Aprobación humana]
     APR -. decisión .-> API
     ORQ --> BUS
@@ -59,6 +63,12 @@ app/
 ├── llm/
 │   ├── anthropic_llm.py  # Cliente de Claude (SDK oficial)
 │   └── fake_llm.py       # LLM simulado para demo, pruebas y CI
+├── rag/
+│   ├── bm25.py           # Ranking BM25 (Okapi)
+│   ├── embeddings.py     # Embeddings opcionales (Voyage AI) y similitud coseno
+│   ├── retriever.py      # Búsqueda híbrida con Reciprocal Rank Fusion
+│   └── eval.py           # Set de evaluación: recall@k y MRR
+├── text.py               # Normalización, stopwords y stemming en español
 ├── api.py                # Endpoints REST y WebSocket
 ├── models.py             # Modelos de SQLAlchemy
 ├── pricing.py            # Costo por modelo
@@ -89,12 +99,29 @@ Abre http://localhost:8000, elige un ticket de ejemplo y envíalo. La documentac
 docker compose up --build
 ```
 
-**Pruebas:**
+**Pruebas y evaluación de la búsqueda:**
 
 ```bash
 pytest -q
 ruff check . && ruff format --check .
+python -m app.rag.eval
 ```
+
+## Búsqueda en la base de conocimiento (RAG)
+
+El agente Resolver consulta la base de conocimiento con `search_knowledge_base`. Los empleados describen el problema con sus palabras ("mis archivos no se suben a la nube"), no con el título del artículo ("OneDrive no sincroniza archivos"), así que una búsqueda por palabras exactas falla seguido.
+
+- **BM25** escrito desde cero ([app/rag/bm25.py](app/rag/bm25.py)), con normalización de acentos, stopwords y stemming ligero en español.
+- **Embeddings opcionales:** con `VOYAGE_API_KEY` y `pip install -e ".[rag]"` se suma la búsqueda semántica.
+- **Fusión con Reciprocal Rank Fusion:** combina los dos rankings sin calibrar puntajes de escalas distintas. Cada resultado indica en qué posición lo puso cada método.
+- **Evaluación medible:** [app/rag/eval.py](app/rag/eval.py) tiene 17 consultas parafraseadas con su artículo esperado. La CI falla si recall@3 baja de 0.95.
+
+| Método | recall@1 | recall@3 |
+|---|---|---|
+| Coincidencia de subcadenas (versión inicial) | 0.71 | 0.94 |
+| **BM25 + tokenización en español** | **1.00** | **1.00** |
+
+> El set de evaluación es pequeño y lo escribí junto con la base de conocimiento, así que sirve como prueba de regresión, no como benchmark. El siguiente paso sería un set de tickets reales.
 
 ## Escenarios de demo
 
@@ -129,9 +156,13 @@ ruff check . && ruff format --check .
 | `GET` | `/api/metrics` | Tasa de autorresolución, costo y tiempo promedio, tokens |
 | `WS` | `/ws/events` | Eventos en tiempo real |
 
+## Demo en línea
+
+El botón **Deploy to Render** de arriba crea una copia en modo demo con el plan gratuito, usando [render.yaml](render.yaml). En el plan gratuito el servicio se duerme tras 15 minutos sin uso: la primera visita tarda unos 30 segundos y los datos de la demo se reinician.
+
 ## Próximos pasos
 
-- Búsqueda semántica (RAG) con pgvector sobre la base de conocimiento.
+- Guardar los embeddings en PostgreSQL con pgvector para escalar a miles de artículos.
 - Migraciones con Alembic y autenticación con roles (JWT).
 - Trazas con OpenTelemetry y un set de evaluaciones para medir la calidad de los agentes.
 - Integración con correo o Microsoft Teams como canal de entrada.

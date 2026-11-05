@@ -1,0 +1,15 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+# Demo pública en modo simulado (sin API key ni costo). Para usar Claude real, agrega
+# ANTHROPIC_API_KEY y ORQUESTA_ADMIN_TOKEN en el panel de Render.
+services:
+  - type: web
+    name: orquesta
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ORQUESTA_LLM_MODE
+        value: fake
+      - key: ORQUESTA_FAKE_LATENCY_S
+        value: "0.9"

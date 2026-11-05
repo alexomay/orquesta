@@ -4,7 +4,6 @@ Cada herramienta declara su entrada con un modelo Pydantic (de ahí sale el JSON
 que recibe Claude) y si requiere aprobación humana antes de ejecutarse.
 """
 
-import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -13,8 +12,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from ..llm.fake_llm import norm
-from ..models import Asset, Employee, KBArticle, Service, Ticket, TicketNote
+from ..models import Asset, Employee, Service, Ticket, TicketNote
+from ..rag import Retriever
+from ..text import norm
 
 
 class ToolError(Exception):
@@ -26,6 +26,7 @@ class ToolContext:
     sessions: async_sessionmaker
     ticket_id: int
     run_id: int
+    retriever: Retriever
 
 
 class ToolInput(BaseModel):
@@ -89,7 +90,7 @@ async def _employee(ctx: ToolContext, email: str) -> Employee:
 
 
 class SearchKB(ToolInput):
-    query: str = Field(description="Palabras clave del problema, en español.")
+    query: str = Field(description="El problema descrito con tus palabras, en español.")
 
 
 @tool(
@@ -99,19 +100,15 @@ class SearchKB(ToolInput):
     SearchKB,
 )
 async def search_knowledge_base(ctx: ToolContext, args: SearchKB) -> dict[str, Any]:
-    terms = {t for t in re.findall(r"[a-z0-9]+", norm(args.query)) if len(t) > 2}
-    async with ctx.sessions() as s:
-        articles = (await s.scalars(select(KBArticle))).all()
-
-    def score(a: KBArticle) -> int:
-        title, tags, body = norm(a.title), norm(a.tags), norm(a.content)
-        return sum(3 * (t in title) + 3 * (t in tags) + (t in body) for t in terms)
-
-    ranked = sorted(((score(a), a) for a in articles), key=lambda x: -x[0])
-    results = [
-        {"id": a.id, "title": a.title, "content": a.content} for sc, a in ranked[:3] if sc > 0
-    ]
-    return {"query": args.query, "results": results}
+    hits = await ctx.retriever.search(args.query, k=3)
+    return {
+        "query": args.query,
+        "method": ctx.retriever.mode,
+        "results": [
+            {"id": h.id, "title": h.title, "content": h.content, "score": h.score, "ranks": h.ranks}
+            for h in hits
+        ],
+    }
 
 
 class EmailInput(ToolInput):
